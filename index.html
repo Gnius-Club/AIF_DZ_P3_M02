@@ -14,6 +14,13 @@
     }
     html,body{height:100%;}
     body{ margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans", Ubuntu, Cantarell, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji"; background: radial-gradient(1200px 800px at 20% 20%, #1b2a6b 0%, var(--bg) 60%); color:var(--text); }
+    
+    /* Clase para congelar animaciones en pausa */
+    body.is-paused *, body.is-paused *::before, body.is-paused *::after {
+      animation-play-state: paused !important;
+      transition: none !important;
+    }
+
     .wrap{ max-width: 1200px; margin: 0 auto; padding: 16px 16px 32px; display:grid; gap:16px; }
     header{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; position: relative; z-index: 30; }
     h1{font-size:clamp(24px, 4vw, 40px); margin:.2rem 0; letter-spacing:.5px}
@@ -65,6 +72,12 @@
     #antivirus-btn { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); padding: 16px 24px; font-size: 20px; border-radius: 20px; background: linear-gradient(180deg, #00d08a, #008a5c); color: #fff; text-shadow: 0 1px 2px #000; animation: hiPulse 1.1s ease-in-out infinite; }
     .board.flash { animation: antivirus-flash 0.4s ease-out; }
 
+    /* Overlay general styles */
+    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: grid; place-items: center; z-index: 100; backdrop-filter: blur(5px); }
+    .modal { background: #132b69; padding: 32px; border-radius: 24px; border: 4px solid var(--accent); text-align: center; max-width: 400px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+    .modal h3 { margin-top: 0; font-size: 28px; color: var(--accent-2); }
+    .row { display: flex; justify-content: center; gap: 12px; margin-top: 24px; }
+
     @keyframes pulse{ 50%{ box-shadow: 0 0 0 6px rgba(0,212,255,.65), 0 0 50px 16px rgba(0,212,255,.55) inset; } }
     @keyframes hiPulse{ 50%{ box-shadow: 0 0 0 4px #ffe17a, 0 0 30px 14px rgba(255,225,122,.85);} }
     @keyframes fadeInDown { from { opacity: 0; transform: translate(-50%, -20px); } to { opacity: 1; transform: translate(-50%, 0); } }
@@ -79,7 +92,12 @@
   <div class="wrap" role="application">
     <header>
       <div><h1 id="title">El Club Secreto: Guardianes de la Fortaleza</h1><p class="tagline">Protege tu espacio digital usando escudos de privacidad.</p></div>
-      <div class="row"><button class="btn secondary" id="btn-help">Ayuda</button><button class="btn secondary" id="btn-tutorial-restart">Ver Tutorial</button><button class="btn" id="btn-start">Comenzar Defensa</button></div>
+      <div class="row">
+        <button class="btn secondary" id="btn-help">Ayuda</button>
+        <button class="btn secondary" id="btn-tutorial-restart">Ver Tutorial</button>
+        <button class="btn secondary" id="btn-pause" style="display:none;" aria-label="Pausar juego">⏸ Pausa</button>
+        <button class="btn" id="btn-start">Comenzar Defensa</button>
+      </div>
     </header>
     <div class="status" aria-live="polite"><div class="pill" id="wave-pill">Oleada: 0/4</div><div class="pill" id="score-pill">Felicidad: 100</div><div class="pill" id="key-pill">Llaves doradas: 0</div><div class="pill" id="goal-pill" hidden></div></div>
     <div class="game">
@@ -103,16 +121,33 @@
     </div>
     <footer><span aria-hidden="true">🛡️</span> Ciudadanía Digital — Privacidad y Seguridad Digital. <span aria-hidden="true">🧠</span></footer>
   </div>
+  
+  <!-- Pantalla de Resultado -->
   <div class="overlay" id="result" hidden role="dialog" aria-modal="true" style="display:none"><div class="modal"><h3 id="result-title">Fin</h3><p id="result-desc"></p><div class="row"><button class="btn" id="btn-retry">Jugar de nuevo</button></div></div></div>
+  
+  <!-- Pantalla de Pausa -->
+  <div class="overlay" id="pause-overlay" hidden style="display:none"><div class="modal"><h3>Juego Pausado</h3><p>Tómate un respiro, Guardián.</p><div class="row"><button class="btn secondary" id="btn-restart-pause">Reiniciar</button><button class="btn" id="btn-resume">Continuar ▶</button></div></div></div>
+
+  <!-- Pantalla de Tutorial -->
   <div class="overlay tutorial" id="tutorial"><div class="modal" style="width: min(480px, 92vw); pointer-events: auto;"><h3 id="tut-title">¡Bienvenido al Tutorial!</h3><p id="tut-desc">Aprende a usar cada escudo para proteger tu club.</p><div id="tut-body" style="min-height:120px; margin-top:6px; padding: 10px; background: #0c1e4f; border-radius: var(--radius);"></div><div class="progress"><div id="tut-bar" class="bar" style="width:0%"></div></div><div class="steps" style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;"><button class="btn secondary" id="tut-skip">Omitir Tutorial y Jugar</button><div style="display: flex; align-items: center; gap: 10px;"><button class="btn secondary" id="tut-prev" disabled>←</button><div id="tut-step-label" aria-live="polite">Paso 1/8</div><button class="btn" id="tut-next">→</button></div></div></div></div>
 
   <script>
   const VOZ_ON = true;
-  function speak(text){ if(!VOZ_ON || !('speechSynthesis' in window)) return; const u = new SpeechSynthesisUtterance(text); u.lang = 'es-MX'; u.rate = 1.05; u.pitch = 1.0; u.volume = 1.0; window.speechSynthesis.speak(u); }
+  
+  // MEJORA 1: Función speak robusta para evitar trabas
+  function speak(text){ 
+    if(!VOZ_ON || !('speechSynthesis' in window)) return; 
+    // Cancelar cualquier audio pendiente para evitar que se amontonen
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text); 
+    u.lang = 'es-MX'; u.rate = 1.05; u.pitch = 1.0; u.volume = 1.0; 
+    window.speechSynthesis.speak(u); 
+  }
+  
   const audioCtx = typeof AudioContext !== 'undefined' ? new AudioContext() : null;
   function beep(type='ok', volume=0.06){ if(!audioCtx) return; const o = audioCtx.createOscillator(); const g = audioCtx.createGain(); o.type = type==='error' ? 'square' : 'sine'; o.frequency.value = type==='error'? 140 : 540; g.gain.value = volume; o.connect(g); g.connect(audioCtx.destination); o.start(); setTimeout(()=>o.stop(), 160); }
 
-  const state = { running:false, waveIndex:0, score:100, keys:0, profilePrivate:false, messagesFriendsOnly:false, friendsListOnlyMe:false, phishReportedCount: 0, toggles:[], spawnTimer:null, entities: [], hintsShown: new Set(), antivirusReady: false, disabledSwitchId: null };
+  const state = { running:false, paused: false, waveIndex:0, score:100, keys:0, profilePrivate:false, messagesFriendsOnly:false, friendsListOnlyMe:false, phishReportedCount: 0, toggles:[], spawnTimer:null, entities: [], hintsShown: new Set(), antivirusReady: false, disabledSwitchId: null };
 
   const ENTITY_SPECS = {
     friend: { emoji: '🙂', speed: 1.1 }, bot: { emoji: '❓', speed: 1.0, hint: 'tgl-profile' },
@@ -137,6 +172,8 @@
   const keyPill = document.getElementById('key-pill');
   const goalPill = document.getElementById('goal-pill');
   const btnStart = document.getElementById('btn-start');
+  const btnPause = document.getElementById('btn-pause');
+  const pauseOverlay = document.getElementById('pause-overlay');
   const btnTutorialRestart = document.getElementById('btn-tutorial-restart');
   const btnReport = document.getElementById('btn-report');
   const antivirusBtn = document.getElementById('antivirus-btn');
@@ -152,6 +189,9 @@
   function announceMsg(text){ if (announce) announce.textContent = text || ''; }
 
   function toggleSwitch(el){
+    // No permitir cambios si está en pausa o game over
+    if (state.paused || !state.running && el.closest('#tutorial').hidden) return;
+    
     const cur = el.getAttribute('data-state'); const next = cur === 'left' ? 'right' : 'left';
     el.setAttribute('data-state', next);
     el.querySelector('.thumb').textContent = next === 'left' ? el.getAttribute('data-left') : el.getAttribute('data-right');
@@ -166,9 +206,33 @@
   function shieldOn(){ shieldVisual.className = 'shield force'; }
   function shieldOff(){ shieldVisual.className = 'shield'; }
 
+  // MEJORA 2: Función de Toggle Pause
+  function togglePause() {
+    if (!state.running) return;
+    state.paused = !state.paused;
+    
+    if (state.paused) {
+      document.body.classList.add('is-paused');
+      pauseOverlay.style.display = 'grid';
+      pauseOverlay.hidden = false;
+      window.speechSynthesis.cancel(); // Silenciar al pausar
+      btnPause.style.display = 'none';
+    } else {
+      document.body.classList.remove('is-paused');
+      pauseOverlay.style.display = 'none';
+      pauseOverlay.hidden = true;
+      btnPause.style.display = 'inline-block';
+      spawnLoop(); // Reiniciar loop de enemigos
+    }
+  }
+
   function iniciarJuego(){
     tutorial.hidden = true; tutorial.style.display = 'none';
-    state.running = true; state.waveIndex = 0; state.score = 100; state.phishReportedCount = 0;
+    state.running = true; state.paused = false; 
+    document.body.classList.remove('is-paused');
+    btnPause.style.display = 'inline-block'; // Mostrar botón pausa
+    
+    state.waveIndex = 0; state.score = 100; state.phishReportedCount = 0;
     state.antivirusReady = false; antivirusBtn.hidden = true;
     if (state.disabledSwitchId) { document.getElementById(state.disabledSwitchId).parentElement.classList.remove('glitched'); state.disabledSwitchId = null; }
     state.profilePrivate = false; state.messagesFriendsOnly = false; state.friendsListOnlyMe = false; state.hintsShown.clear();
@@ -191,29 +255,38 @@
     announceMsg(waveMessage); speak(waveMessage);
     
     btnReport.disabled = !wave.infinite;
-    state.spawnTimer && clearInterval(state.spawnTimer);
+    state.spawnTimer && clearTimeout(state.spawnTimer);
     
-    let spawnCount = 0; const maxSpawns = 12;
-    function spawnLoop() {
-        if (!state.running) return;
-        const isInfinite = OLEADAS[state.waveIndex-1]?.infinite;
-        if (!isInfinite && spawnCount >= maxSpawns) { setTimeout(() => nextWave(), 5000); return; }
-
-        let nextSpawnDelay = 1500 + Math.random() * 2000;
-        if (Math.random() < 0.25) { // 25% chance of a swarm
-            const swarmSize = 2 + Math.floor(Math.random() * 2);
-            for (let i=0; i < swarmSize; i++) {
-                setTimeout(() => spawnEntity(wave.pool[Math.floor(Math.random() * wave.pool.length)]), i * 400);
-            }
-            spawnCount += swarmSize;
-            nextSpawnDelay += swarmSize * 400;
-        } else {
-            spawnEntity(wave.pool[Math.floor(Math.random() * wave.pool.length)]);
-            spawnCount++;
-        }
-        state.spawnTimer = setTimeout(spawnLoop, nextSpawnDelay);
-    }
+    state.spawnCount = 0; // Usar variable en state para persistencia
+    state.currentWavePool = wave.pool;
+    state.isInfinite = wave.infinite;
+    
     spawnLoop();
+  }
+
+  function spawnLoop() {
+    if (!state.running || state.paused) return; // Detener si está pausado
+    
+    const maxSpawns = 12;
+    if (!state.isInfinite && state.spawnCount >= maxSpawns) { 
+        setTimeout(() => { if(!state.paused && state.running) nextWave(); }, 5000); 
+        return; 
+    }
+
+    let nextSpawnDelay = 1500 + Math.random() * 2000;
+    
+    if (Math.random() < 0.25) { 
+        const swarmSize = 2 + Math.floor(Math.random() * 2);
+        for (let i=0; i < swarmSize; i++) {
+            setTimeout(() => { if(!state.paused) spawnEntity(state.currentWavePool[Math.floor(Math.random() * state.currentWavePool.length)]); }, i * 400);
+        }
+        state.spawnCount += swarmSize;
+        nextSpawnDelay += swarmSize * 400;
+    } else {
+        spawnEntity(state.currentWavePool[Math.floor(Math.random() * state.currentWavePool.length)]);
+        state.spawnCount++;
+    }
+    state.spawnTimer = setTimeout(spawnLoop, nextSpawnDelay);
   }
 
   function highlightHint(elementId) {
@@ -224,6 +297,7 @@
   }
 
   function spawnEntity(kind){
+    if (state.paused) return;
     const spec = ENTITY_SPECS[kind];
     if (spec.hint) { highlightHint(spec.hint); }
     const e = document.createElement('button');
@@ -245,11 +319,22 @@
     } else if (spec.behavior === 'drain') {
         e.style.right = '10px';
         club.classList.add('draining');
-        e._drainTimer = setInterval(() => { if(state.running) damage('¡El Bot Imitador está molestando!', 2); }, 1500);
+        e._drainTimer = setInterval(() => { 
+            // MEJORA 3: Lógica Impersonator arreglada
+            // Verifica pausa y usa modo silencioso para damage
+            if(state.running && !state.paused) { 
+                damage('¡El Bot Imitador está molestando!', 2, true); // true = silencioso
+            } 
+        }, 1500);
+        // Feedback inicial hablado solo una vez
+        speak('¡Alerta! Un Bot Imitador se ha colado. Revisa tu lista de amigos.');
     } else {
         const end = 70; let x = board.clientWidth - 80;
         const step = ()=>{
             if (!e.parentNode) return;
+            // MEJORA 4: Congelar movimiento en JS
+            if (state.paused) { e._anim = requestAnimationFrame(step); return; }
+            
             let speedMultiplier = 1.0;
             if (spec.behavior === 'immune' && state.profilePrivate && x < 310 && x > 90) { e.classList.add('phasing'); speedMultiplier = 0.5; } else { e.classList.remove('phasing'); }
             x -= (spec.speed || 1) * 2.0 * speedMultiplier;
@@ -265,7 +350,7 @@
     if(!entity || !entity.parentNode) return;
     const kind = entity.dataset.kind;
     if (kind === 'phish') { damage('¡El Bot de Phishing ha entrado!', 30); removeEntity(entity); return; }
-    if (kind === 'data_packet') { removeEntity(entity); return; } // Disappears if not clicked
+    if (kind === 'data_packet') { removeEntity(entity); return; } 
     if(kind==='friend'){
       if(state.profilePrivate) { addScore(15, '¡Amigo entró seguro!'); } 
       else { addScore(5, 'Amigo entró, pero el perfil es Público.'); }
@@ -293,6 +378,7 @@
   }
   
   board.addEventListener('click', (event) => {
+    if (state.paused) return;
     const target = event.target.closest('.entity');
     if (!target || !state.running) return;
     const kind = target.dataset.kind;
@@ -314,7 +400,7 @@
   });
 
   antivirusBtn.addEventListener('click', () => {
-    if (!state.antivirusReady) return;
+    if (!state.antivirusReady || state.paused) return;
     state.antivirusReady = false;
     antivirusBtn.hidden = true;
     board.classList.add('flash');
@@ -325,7 +411,7 @@
   });
   
   function handlePhishReport() {
-    if (!state.running || OLEADAS[state.waveIndex - 1]?.id !== 4) return;
+    if (!state.running || state.paused || OLEADAS[state.waveIndex - 1]?.id !== 4) return;
     const phishBot = state.entities.find(e => e.dataset.kind === 'phish');
     if (phishBot) {
         state.phishReportedCount++; updateHUD();
@@ -336,7 +422,16 @@
   }
   
   function addScore(n, msg=''){ state.score = Math.max(0, state.score + n); updateHUD(); if(msg) feedback('ok', msg); scorePill.classList.add('score-updated'); setTimeout(() => scorePill.classList.remove('score-updated'), 300); }
-  function damage(msg, amount = 10){ addScore(-amount); feedback('error', msg); const graffiti = document.createElement('div'); graffiti.className = 'graffiti'; club.appendChild(graffiti); setTimeout(() => graffiti.remove(), 1000); if(state.score<=0 && state.running) finalizarJuego('derrota'); }
+  
+  // MEJORA: Parametro 'silent' para evitar spam de voz
+  function damage(msg, amount = 10, silent = false){ 
+    addScore(-amount); 
+    feedback('error', msg, silent); 
+    const graffiti = document.createElement('div'); graffiti.className = 'graffiti'; club.appendChild(graffiti); 
+    setTimeout(() => graffiti.remove(), 1000); 
+    if(state.score<=0 && state.running) finalizarJuego('derrota'); 
+  }
+
   function nextWave(){ if(state.waveIndex >= OLEADAS.length -1){ mostrarOleada(3); } else { mostrarOleada(state.waveIndex); } }
   function removeEntity(entity, delay = 0) { if(!entity) return; cancelAnimationFrame(entity._anim); clearInterval(entity._drainTimer); setTimeout(() => { entity.remove(); state.entities = state.entities.filter(e => e !== entity); }, delay); }
   function clearEntities(){ [...state.entities].forEach(e => removeEntity(e)); club.classList.remove('draining');}
@@ -344,10 +439,17 @@
   function updateHUD(){ wavePill.textContent = `Oleada: ${Math.min(state.waveIndex,4)}/4`; scorePill.textContent = `Felicidad: ${state.score}`; keyPill.textContent = `Llaves doradas: ${state.keys}`; if (OLEADAS[state.waveIndex-1]?.infinite) { goalPill.textContent = `Reportados: ${state.phishReportedCount}/${OLEADAS[3].goal}`; } else { goalPill.hidden = true; } }
   function kindToClass(kind) { return {friend:'friend', bot:'bot', phish:'phish', spam:'spam', potential_friend: 'potential_friend', disguised_bot: 'bot', glitch_bot: 'glitch_bot', data_packet: 'data_packet'}[kind] || ''; }
   function labelFor(kind){ return {friend:'Amigo', bot:'Curi‑Bot', phish:'Bot de Phishing', spam:'Spam', potential_friend:'Invitación', disguised_bot: 'Bot Imitador', glitch_bot: 'Glitch Bot', data_packet: 'Paquete de Datos'}[kind] || 'Entidad'; }
-  function feedback(tipo, msg){ if(tipo==='ok'){ speak(msg); beep('ok'); } else if(tipo==='error'){ speak(msg); beep('error'); } else if(tipo==='boss'){ speak(msg); } announce.textContent = msg; }
+  
+  function feedback(tipo, msg, silent = false){ 
+    if(tipo==='ok'){ if(!silent) speak(msg); beep('ok'); } 
+    else if(tipo==='error'){ if(!silent) speak(msg); beep('error'); } 
+    else if(tipo==='boss'){ speak(msg); } 
+    announce.textContent = msg; 
+  }
 
   function finalizarJuego(resultado){
-    state.running = false; clearEntities(); clearInterval(state.spawnTimer);
+    state.running = false; clearEntities(); clearTimeout(state.spawnTimer);
+    btnPause.style.display = 'none'; // Ocultar pausa al final
     mentorMessage.hidden = true;
     let title='', desc='';
     if(resultado==='victoria'){ state.keys += 1; updateHUD(); title = '¡Victoria! Fiesta segura 🎉'; desc = '¡Misión cumplida! Tu club es una fortaleza.'; } 
@@ -375,6 +477,12 @@
   
   btnStart.addEventListener('click', iniciarJuego);
   btnTutorialRestart.addEventListener('click', () => startTutorial(true));
+  
+  // Event listeners para pausa
+  btnPause.addEventListener('click', togglePause);
+  document.getElementById('btn-resume').addEventListener('click', togglePause);
+  document.getElementById('btn-restart-pause').addEventListener('click', () => { togglePause(); iniciarJuego(); });
+  
   [tProfile, tMsg, tFriends].forEach(t=>{ t.addEventListener('click', ()=> toggleSwitch(t)); t.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' ') { e.preventDefault(); toggleSwitch(t); } }); });
   btnReport.addEventListener('click', handlePhishReport);
   document.getElementById('btn-retry').addEventListener('click', iniciarJuego);
