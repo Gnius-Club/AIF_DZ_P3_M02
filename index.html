@@ -1,0 +1,723 @@
+<!doctype html>
+<html lang="es" data-theme="kids">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>El Club Secreto: Guardianes de la Fortaleza</title>
+  <meta name="description" content="Juego educativo de ciudadanía digital sobre privacidad y gestión de información personal. Single-page app con accesibilidad y sin librerías externas." />
+  <meta name="color-scheme" content="light" />
+  <style>
+    :root{
+      --bg:#0c1533;           /* noche cósmica */
+      --panel:#0e215a;        /* azul profundo */
+      --accent:#00d4ff;       /* cian brillante */
+      --accent-2:#ffc400;     /* dorado */
+      --ok:#00d08a;           /* verde ok */
+      --warn:#ff6b6b;         /* rojo alerta */
+      --friend:#6ee7a4;       /* amigo */
+      --bot:#c1c7d0;          /* curi-bot */
+      --text:#ffffff;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --radius: 18px;
+      --focus: 3px solid #fff;
+      --btn: linear-gradient(180deg, #00e1ff, #0099ff);
+      --btn-warn: linear-gradient(180deg, #ff9aa2, #ff4d4d);
+    }
+    html,body{height:100%;}
+    body{
+      margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans", Ubuntu, Cantarell, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      background: radial-gradient(1200px 800px at 20% 20%, #1b2a6b 0%, var(--bg) 60%);
+      color:var(--text);
+    }
+    .wrap{
+      max-width: 1200px; margin: 0 auto; padding: 16px 16px 32px; display:grid; gap:16px;
+      grid-template-columns: 1fr; grid-auto-rows: min-content;
+    }
+    header{
+      display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+    }
+    h1{font-size:clamp(24px, 4vw, 40px); margin:.2rem 0; letter-spacing:.5px}
+    .tagline{opacity:.9; font-size:clamp(14px,2.4vw,16px)}
+
+    /* Zona principal: tablero + panel */
+    .game{
+      display:grid; grid-template-columns: 1.1fr .9fr; gap:16px; align-items:stretch;
+    }
+    @media (max-width: 960px){ .game{grid-template-columns: 1fr;} }
+
+    .board{
+      position: relative; background: linear-gradient(180deg,#0d2155,#0a1a44); border-radius: var(--radius);
+      box-shadow: var(--shadow); overflow:hidden; min-height: 420px;
+    }
+    .ground{ position:absolute; left:0; right:0; bottom:0; height:90px; background: linear-gradient(180deg,#254,#172); }
+    .club{
+      position:absolute; left:24px; bottom:90px; width: 280px; height: 220px;
+      background: linear-gradient(180deg, #173e8c, #0d2b67);
+      border:4px solid #7fb3ff; border-radius: 16px; box-shadow: inset 0 0 0 4px rgba(0,0,0,.2);
+    }
+    .club .door{ position:absolute; bottom:0; left:18px; width: 95px; height: 130px; background: #5b3719; border:4px solid #3a210f; border-bottom:none; border-radius: 12px 12px 0 0; overflow:hidden; }
+    .club .sign{ position:absolute; top:8px; left:50%; transform:translateX(-50%); padding:6px 10px; border-radius: 12px; background: var(--accent-2); color:#2b1600; font-weight:800; box-shadow: 0 2px 0 rgba(0,0,0,.2); }
+    .club .shield{ position:absolute; inset:-6px; border-radius: 16px; pointer-events:none; }
+    .force{ box-shadow: 0 0 0 6px rgba(0,212,255,.5), 0 0 30px 12px rgba(0,212,255,.35) inset; border-radius:16px; animation: pulse 1.2s ease-in-out infinite; }
+    @keyframes pulse{ 50%{ box-shadow: 0 0 0 6px rgba(0,212,255,.65), 0 0 50px 16px rgba(0,212,255,.55) inset; } }
+
+    /* Entidades que entran desde la derecha */
+    .entity{ position:absolute; bottom:100px; right:-100px; width:70px; height:70px; border-radius: 16px; display:grid; place-items:center; font-size:34px; font-weight:800; color:#111; outline:none; }
+    .friend{ background: var(--friend); border:4px solid #228b5a; }
+    .bot{ background: var(--bot); border:4px solid #70757a; }
+    .phish{ background: #ffd6a5; border:4px solid #b66a00; }
+    .spam{ width: 54px; height:38px; border-radius: 6px; background:#c5ffd6; border:4px solid #1aa36b; font-size:22px; }
+
+    /* Panel de control */
+    .panel{
+      background: linear-gradient(180deg, #132b69, #0c245b); border-radius: var(--radius); box-shadow: var(--shadow); padding:16px; display:grid; gap:12px;
+    }
+    .panel h2{ margin:.2rem 0 .4rem; font-size: clamp(18px,2.6vw,22px) }
+    .switch{
+      display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; background:#0c1e4f; border:2px solid #1c3b8c; border-radius: 14px;
+    }
+    .switch label{ font-weight:700; letter-spacing:.3px }
+    .toggle{ position:relative; width: 170px; height: 44px; border-radius: 999px; background:#203d8e; border:2px solid #3a6be0; cursor:pointer; }
+    .thumb{ position:absolute; top:3px; left:3px; width: 80px; height: 34px; border-radius: 999px; background: var(--accent); transition: transform .2s ease; display:grid; place-items:center; color:#00203a; font-weight:900; }
+    .toggle[data-state="right"] .thumb{ transform: translateX(82px); }
+
+    .btn{ padding:12px 16px; border:none; border-radius: 16px; background: var(--btn); color:#00203a; font-weight:900; cursor:pointer; box-shadow: var(--shadow); font-size:16px; }
+    .btn[aria-pressed="true"]{ filter:saturate(1.1) brightness(1.05); }
+    .btn.secondary{ background: linear-gradient(180deg, #e0edff, #9ec8ff); }
+    .btn.warn{ background: var(--btn-warn); color:#2d0000; }
+    .row{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+
+    /* UI superior: estado */
+    .status{
+      display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+      background: #0b1b49; border:2px solid #254aa8; border-radius: var(--radius); padding:10px 12px;
+    }
+    .pill{ background:#072047; padding:8px 12px; border-radius: 999px; border:1px solid #1e57c3; font-weight:800 }
+
+    /* Inicio / modal */
+    .overlay{ position:fixed; inset:0; display:grid; place-items:center; background: rgba(5,10,25,.66); backdrop-filter: blur(3px); z-index:20; }
+    .modal{ max-width: 760px; background: linear-gradient(180deg, #102a6c, #0a1f51); border:3px solid #3a6be0; border-radius: 20px; padding:18px; box-shadow: var(--shadow); }
+    .modal h3{ margin-top:0; font-size:28px }
+    .grid-2{ display:grid; grid-template-columns: 1fr 1fr; gap:14px }
+    @media (max-width: 720px){ .grid-2{ grid-template-columns: 1fr } }
+
+    /* Accesibilidad visual */
+    :focus-visible{ outline: var(--focus); outline-offset:2px }
+
+    /* ARIA live feedback */
+    .sr-only{ position:absolute!important; height:1px; width:1px; overflow:hidden; clip:rect(1px,1px,1px,1px); white-space:nowrap; }
+
+    footer{ opacity:.9; font-size: 13px; text-align:center; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <div class="wrap" role="application" aria-label="Juego educativo: El Club Secreto — Guardianes de la Fortaleza">
+    <header>
+      <div>
+        <h1 id="title">El Club Secreto: Guardianes de la Fortaleza</h1>
+        <p class="tagline" id="tagline">Objetivo: aplicar configuraciones básicas de privacidad en apps escolares.</p>
+      </div>
+      <div class="row" aria-label="Controles superiores">
+        <button class="btn secondary" id="btn-help" aria-describedby="help-desc">Ayuda</button>
+        <button class="btn" id="btn-start" aria-describedby="start-desc">Comenzar defensa</button>
+      </div>
+    </header>
+
+    <div class="status" aria-live="polite">
+      <div class="pill" id="wave-pill" aria-label="Oleada actual">Oleada: 0/4</div>
+      <div class="pill" id="score-pill" aria-label="Puntos de Felicidad">Felicidad: 100</div>
+      <div class="pill" id="key-pill" aria-label="Llaves doradas">Llaves doradas: 0</div>
+      <div class="pill" id="mode-pill" aria-label="Modo actual">Modo: Historia</div>
+    </div>
+
+    <div class="game" aria-label="Zona de juego">
+      <section class="board" id="board" aria-label="Tablero de defensa del club">
+        <div class="club" aria-hidden="false" aria-label="Club digital con puerta principal">
+          <div class="sign" aria-hidden="true">CLUB SECRETO</div>
+          <div class="door" aria-hidden="true"></div>
+          <div class="shield" id="shield-visual" aria-hidden="true"></div>
+        </div>
+        <div class="ground" aria-hidden="true"></div>
+
+        <div id="announce" class="sr-only" aria-live="assertive"></div>
+      </section>
+
+      <aside class="panel" id="control-panel" aria-label="Panel de control de privacidad" aria-describedby="panel-desc">
+        <h2>Panel de Control — Escudos de Privacidad</h2>
+        <p id="panel-desc">Usa flechas izquierda/derecha para moverte entre controles y Enter para cambiar. También puedes hacer clic.</p>
+
+        <div class="switch" role="group" aria-labelledby="lbl-profile">
+          <label id="lbl-profile">Perfil</label>
+          <div class="toggle" id="tgl-profile" tabindex="0" role="switch" aria-checked="false" aria-label="Perfil: Público o Privado" data-state="left" data-left="Público" data-right="Privado">
+            <div class="thumb" aria-hidden="true">Público</div>
+          </div>
+        </div>
+
+        <div class="switch" role="group" aria-labelledby="lbl-msg">
+          <label id="lbl-msg">Quién puede enviarte mensajes</label>
+          <div class="toggle" id="tgl-msg" tabindex="0" role="switch" aria-checked="false" aria-label="Mensajes: Todos o Solo amigos" data-state="left" data-left="Todos" data-right="Solo amigos">
+            <div class="thumb" aria-hidden="true">Todos</div>
+          </div>
+        </div>
+
+        <div class="switch" role="group" aria-labelledby="lbl-friends">
+          <label id="lbl-friends">Quién puede ver tu lista de amigos</label>
+          <div class="toggle" id="tgl-friends" tabindex="0" role="switch" aria-checked="false" aria-label="Lista de amigos: Todos o Solo yo" data-state="left" data-left="Todos" data-right="Solo yo">
+            <div class="thumb" aria-hidden="true">Todos</div>
+          </div>
+        </div>
+
+        <div class="row">
+          <button class="btn warn" id="btn-report" aria-pressed="false" aria-label="Reportar y bloquear" disabled>Reportar y Bloquear 🚫</button>
+          <button class="btn secondary" id="btn-open-panel">Abrir panel</button>
+        </div>
+      </aside>
+    </div>
+
+    <footer>
+      <span aria-hidden="true">🛡️</span> Ciudadanía Digital — Privacidad: público vs privado · mensajes · lista de amigos. <span aria-hidden="true">🧠</span>
+    </footer>
+  </div>
+
+  <!-- Ventanas modales accesibles (inicio, ayuda, victoria/derrota) -->
+  <div class="overlay" id="intro" role="dialog" aria-modal="true" aria-labelledby="intro-title" aria-describedby="intro-desc">
+    <div class="modal">
+      <h3 id="intro-title">¡Bienvenido, Guardián!</h3>
+      <div class="grid-2">
+        <div>
+          <p id="intro-desc">Eres el Fundador del <strong>Club Secreto Digital</strong>. Junto al <strong>Mentor Guardián</strong> protegerás la fortaleza contra los <strong>Curi‑Bots</strong>. Para ganar, configura correctamente los <em>escudos de privacidad</em> en cada oleada. Control con teclado: flechas ⇦⇨ y Enter. ¿Listo para comenzar?</p>
+          <ul>
+            <li>Escudo Principal: <em>Perfil Privado</em>.</li>
+            <li>Escudo de Mensajes: <em>Solo amigos</em>.</li>
+            <li>Escudo de Lista: <em>Solo yo</em>.</li>
+            <li>Jefe final: <em>Reportar y Bloquear</em>.</li>
+          </ul>
+          <div class="row">
+            <button class="btn" id="intro-start">Comenzar defensa</button>
+            <button class="btn secondary" id="intro-how">¿Cómo jugar?</button>
+          </div>
+        </div>
+        <div aria-hidden="true">
+          <img alt="Ilustración: club digital con escudo brillante" src="data:image/svg+xml;utf8,<?xml version='1.0' encoding='UTF-8'?><svg xmlns='http://www.w3.org/2000/svg' width='360' height='220'><rect width='100%' height='100%' rx='16' fill='%23173e8c'/><rect x='22' y='70' width='160' height='120' rx='14' fill='%230d2b67' stroke='%237fb3ff' stroke-width='6'/><circle cx='102' cy='130' r='78' fill='none' stroke='%2300d4ff' stroke-width='8' opacity='.6'/><text x='24' y='48' fill='%23ffc400' font-family='Verdana' font-size='20' font-weight='bold'>CLUB SECRETO</text></svg>" style="width:100%; height:auto; border-radius:16px; box-shadow: var(--shadow);"/>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="help" hidden role="dialog" aria-modal="true" aria-labelledby="help-title" aria-describedby="help-desc2">
+    <div class="modal">
+      <h3 id="help-title">Ayuda rápida</h3>
+      <p id="help-desc2">Mueve el foco con flechas izquierda/derecha en el panel. Pulsa Enter o haz clic para cambiar opciones. Usa <em>Reportar y Bloquear</em> contra el <strong>Bot de Phishing</strong>. Si entran demasiados Curi‑Bots, pierdes Felicidad. Gana las 4 oleadas para obtener la <strong>Llave Dorada</strong>.</p>
+      <div class="row"><button class="btn" id="help-close">Entendido</button></div>
+    </div>
+  </div>
+
+  <div class="overlay" id="result" hidden role="dialog" aria-modal="true" aria-labelledby="result-title" aria-describedby="result-desc">
+    <div class="modal">
+      <h3 id="result-title">Fin</h3>
+      <p id="result-desc"></p>
+      <div class="row"><button class="btn" id="btn-retry">Jugar de nuevo</button><button class="btn secondary" id="btn-infinite">Modo infinito</button></div>
+    </div>
+  </div>
+
+  <script>
+  // ==========================
+  // Utilidades de audio/voz
+  // ==========================
+  const VOZ_ON = true; // voz en off
+  function speak(text){
+    if(!VOZ_ON || !('speechSynthesis' in window)) return;
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'es-MX';
+    u.rate = 1.05; u.pitch = 1.0; u.volume = 1.0;
+    window.speechSynthesis.speak(u);
+  }
+  // FX simples con WebAudio
+  const audioCtx = typeof AudioContext !== 'undefined' ? new AudioContext() : null;
+  function beep(type='ok'){
+    if(!audioCtx) return;
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = type==='error' ? 'square' : 'sine';
+    o.frequency.value = type==='error'? 140 : 540;
+    g.gain.value = 0.06; o.connect(g); g.connect(audioCtx.destination);
+    o.start(); setTimeout(()=>o.stop(), 160);
+  }
+
+  // ==========================
+  // Estado global del juego
+  // ==========================
+  const state = {
+    running:false,
+    mode:'story', // 'story' | 'infinite'
+    waveIndex:0,
+    score:100,
+    keys:0,
+    // configuraciones actuales
+    profilePrivate:false,
+    messagesFriendsOnly:false,
+    friendsListOnlyMe:false,
+    bossReported:false,
+    // manejo de foco
+    toggles:[],
+    focusIdx:0,
+    // timers
+    spawnTimer:null,
+    moveTimer:null,
+  };
+
+  // ==========================
+  // Datos de oleadas
+  // ==========================
+  const OLEADAS = [
+    {
+      id:1,
+      nombre:'Escudo Principal',
+      tipoAtaque:'enemigos-mixtos',
+      accionCorrecta: 'profilePrivate:true',
+      resultado:'Muralla activa; solo pasan amigos',
+      puntos:+20,
+      spawn: [
+        {kind:'friend', emoji:'🙂', count:2, speed:1.4},
+        {kind:'bot', emoji:'❓', count:3, speed:1.2}
+      ]
+    },
+    {
+      id:2,
+      nombre:'Escudo de Mensajes',
+      tipoAtaque:'spam-mensajes',
+      accionCorrecta: 'messagesFriendsOnly:true',
+      resultado:'Campo de fuerza destruye spam',
+      puntos:+20,
+      spawn: [
+        {kind:'spam', emoji:'✉️', count:6, speed:1.7},
+        {kind:'friend', emoji:'🙂', count:2, speed:1.5}
+      ]
+    },
+    {
+      id:3,
+      nombre:'Escudo de Lista de Amigos',
+      tipoAtaque:'disfraz-amigo',
+      accionCorrecta: 'friendsListOnlyMe:true',
+      resultado:'Curi-Bots confundidos',
+      puntos:+20,
+      spawn: [
+        {kind:'bot', emoji:'❓', count:4, speed:1.5},
+        {kind:'friend', emoji:'🙂', count:2, speed:1.6}
+      ]
+    },
+    {
+      id:4,
+      nombre:'Jefe Final — Bot de Phishing',
+      tipoAtaque:'phishing',
+      accionCorrecta: 'bossReported:true',
+      resultado:'Láser expulsa al bot',
+      puntos:+40,
+      spawn: [
+        {kind:'phish', emoji:'🤖', count:1, speed:1.2}
+      ]
+    }
+  ];
+
+  // ==========================
+  // Elementos del DOM
+  // ==========================
+  const board = document.getElementById('board');
+  const shieldVisual = document.getElementById('shield-visual');
+  const wavePill = document.getElementById('wave-pill');
+  const scorePill = document.getElementById('score-pill');
+  const keyPill = document.getElementById('key-pill');
+  const modePill = document.getElementById('mode-pill');
+  const btnStart = document.getElementById('btn-start');
+  const btnHelp = document.getElementById('btn-help');
+  const btnOpenPanel = document.getElementById('btn-open-panel');
+  const btnReport = document.getElementById('btn-report');
+
+  const tProfile = document.getElementById('tgl-profile');
+  const tMsg = document.getElementById('tgl-msg');
+  const tFriends = document.getElementById('tgl-friends');
+
+  const intro = document.getElementById('intro');
+  const help = document.getElementById('help');
+  const result = document.getElementById('result');
+  const announce = document.getElementById('announce');
+
+  // Registrar toggles para navegación por teclado
+  state.toggles = [tProfile, tMsg, tFriends, btnReport, btnOpenPanel];
+
+  // ==========================
+  // Interfaz accesible: toggles
+  // ==========================
+  function toggleSwitch(el){
+    const cur = el.getAttribute('data-state') || 'left';
+    const next = cur === 'left' ? 'right' : 'left';
+    el.setAttribute('data-state', next);
+    const thumb = el.querySelector('.thumb');
+    const leftText = el.getAttribute('data-left');
+    const rightText = el.getAttribute('data-right');
+    thumb.textContent = next === 'left' ? leftText : rightText;
+    const checked = next === 'right';
+    el.setAttribute('aria-checked', String(checked));
+
+    // actualizar estado
+    if(el === tProfile) state.profilePrivate = checked;
+    if(el === tMsg) state.messagesFriendsOnly = checked;
+    if(el === tFriends) state.friendsListOnlyMe = checked;
+
+    // feedback visual
+    if(state.profilePrivate) shieldOn(); else shieldOff();
+
+    beep('ok');
+  }
+
+  function shieldOn(){ shieldVisual.className = 'shield force'; }
+  function shieldOff(){ shieldVisual.className = 'shield'; }
+
+  // ==========================
+  // Bucle de juego y oleadas
+  // ==========================
+  function iniciarJuego(){
+    // reset
+    state.running = true; state.waveIndex = 0; state.score = 100; state.bossReported = false;
+    state.profilePrivate = false; state.messagesFriendsOnly = false; state.friendsListOnlyMe = false;
+    [tProfile, tMsg, tFriends].forEach(t=>{ t.setAttribute('data-state','left'); t.setAttribute('aria-checked','false'); t.querySelector('.thumb').textContent = t.getAttribute('data-left'); });
+    btnReport.disabled = true; btnReport.setAttribute('aria-pressed','false');
+    updateHUD();
+    clearEntities();
+    speak('¡Bienvenido Guardián! Activa tus escudos y protege el club.');
+    mostrarOleada(0);
+  }
+
+  function mostrarOleada(id){
+    if(!state.running) return;
+    const wave = OLEADAS[id];
+    state.waveIndex = id+1;
+    updateHUD();
+    announceMsg(`Oleada ${state.waveIndex}: ${wave.nombre}`);
+    speak(`Oleada ${state.waveIndex}. ${wave.nombre}.`);
+
+    // Ajustes especiales
+    btnReport.disabled = wave.id !== 4; // solo jefe final
+
+    // Spawns simples
+    let spawnList = [];
+    wave.spawn.forEach(s=>{ for(let i=0;i<s.count;i++){ spawnList.push({...s}); } });
+    // aleatorizar
+    for(let i=spawnList.length-1;i>0;i--){ const j = Math.floor(Math.random()* (i+1)); [spawnList[i], spawnList[j]] = [spawnList[j], spawnList[i]] }
+
+    let idx = 0;
+    state.spawnTimer && clearInterval(state.spawnTimer);
+    state.spawnTimer = setInterval(()=>{
+      if(idx >= spawnList.length){ clearInterval(state.spawnTimer); return; }
+      spawnEntity(spawnList[idx++]);
+    }, 900);
+  }
+
+  function spawnEntity(sp){
+    const e = document.createElement('button');
+    e.className = `entity ${clsFor(sp.kind)}`;
+    e.setAttribute('aria-label', labelFor(sp.kind));
+    e.setAttribute('tabindex','-1');
+    e.dataset.kind = sp.kind; e.dataset.speed = sp.speed;
+    e.textContent = emojiFor(sp);
+    board.appendChild(e);
+
+    // movimiento
+    const start = board.clientWidth - 80; // desde la derecha
+    const end = 70; // borde cercano al club
+    let x = start;
+    e.style.right = `${Math.max(-80, board.clientWidth - x - 80)}px`;
+
+    const step = ()=>{
+      const speed = parseFloat(e.dataset.speed || '1.4');
+      x -= speed * 3.0; // píxeles por frame
+      e.style.right = `${board.clientWidth - x - 80}px`;
+      if(x <= end){
+        // alcanzar la puerta / zona
+        validarAccionEntity(e);
+        e.remove();
+        return;
+      }
+      e._anim = requestAnimationFrame(step);
+    };
+    e._anim = requestAnimationFrame(step);
+  }
+
+  function clsFor(kind){
+    if(kind==='friend') return 'friend';
+    if(kind==='bot') return 'bot';
+    if(kind==='phish') return 'phish';
+    if(kind==='spam') return 'spam';
+    return '';
+  }
+  function labelFor(kind){
+    return ({friend:'Amigo que desea entrar', bot:'Curi‑Bot sospechoso', phish:'Bot de Phishing', spam:'Mensaje sospechoso'})[kind] || 'Entidad';
+  }
+  function emojiFor(sp){ return sp.kind==='spam'? '✉️' : (sp.emoji || '❓'); }
+
+  function validarAccionEntity(e){
+    const kind = e.dataset.kind;
+    const w = OLEADAS[state.waveIndex-1];
+
+    if(kind==='friend'){
+      // Pueden pasar en todos los casos; si perfil es privado, la muralla solo deja amigos
+      feedback('ok', 'Amigo autorizado.');
+      return;
+    }
+
+    if(w.id === 1 && kind==='bot'){
+      if(state.profilePrivate){
+        feedback('ok','Curi‑Bot bloqueado por perfil privado.');
+      } else {
+        damage('¡Curi‑Bot entró! Activa perfil privado.');
+      }
+    }
+
+    if(w.id === 2){
+      if(kind==='spam'){
+        if(state.messagesFriendsOnly){ feedback('ok','Spam destruido por escudo de mensajes.'); }
+        else { damage('Spam-saje recibido. Cambia a Solo amigos.'); }
+      }
+      if(kind==='bot'){
+        if(state.messagesFriendsOnly){ feedback('ok','Curi‑Bot no puede enviar mensajes.'); }
+        else { damage('Curi‑Bot te bombardea con mensajes.'); }
+      }
+    }
+
+    if(w.id === 3){
+      if(kind==='bot'){
+        if(state.friendsListOnlyMe){ feedback('ok','Curi‑Bot confundido; no ve tu lista.'); }
+        else { damage('El bot usó tu lista de amigos. Ponla en Solo yo.'); }
+      }
+    }
+
+    if(w.id === 4 && kind==='phish'){
+      if(state.bossReported){ bossDefeated(); }
+      else { damage('¡Phishing! Usa Reportar y Bloquear.'); }
+    }
+  }
+
+  function validarAccion(id){ /* requerido por especificación, usamos validarAccionEntity para cada entidad */ }
+
+  function bossDefeated(){
+    feedback('boss','¡Jugada maestra, Guardián! ¡Nunca se le da la contraseña a nadie!');
+    addScore(40);
+    // efecto láser visual
+    const laser = document.createElement('div');
+    laser.style.position='absolute'; laser.style.left='0'; laser.style.top='0'; laser.style.right='0'; laser.style.bottom='0';
+    laser.style.boxShadow='inset 0 0 0 6px rgba(255,255,255,.6), 0 0 60px 20px rgba(255,0,0,.6) inset';
+    laser.style.pointerEvents='none'; laser.style.borderRadius='16px';
+    board.appendChild(laser); setTimeout(()=>laser.remove(), 400);
+
+    setTimeout(nextWave, 600);
+  }
+
+  function addScore(n){ state.score = Math.max(0, Math.min(120, state.score + n)); updateHUD(); }
+  function damage(msg){ addScore(-10); feedback('error', msg); if(state.score<=60){ shieldVisual.classList.add('force'); setTimeout(()=>shieldVisual.classList.remove('force'), 600); } }
+
+  function nextWave(){
+    if(state.waveIndex >= OLEADAS.length){ finalizarJuego('victoria'); return; }
+    mostrarOleada(state.waveIndex);
+  }
+
+  function clearEntities(){
+    [...document.querySelectorAll('.entity')].forEach(n=>{ cancelAnimationFrame(n._anim); n.remove(); });
+  }
+
+  function updateHUD(){
+    wavePill.textContent = `Oleada: ${Math.min(state.waveIndex,4)}/4`;
+    scorePill.textContent = `Felicidad: ${state.score}`;
+    keyPill.textContent = `Llaves doradas: ${state.keys}`;
+    modePill.textContent = `Modo: ${state.mode==='story' ? 'Historia' : 'Infinito'}`;
+  }
+
+  // ==========================
+  // Panel, feedback y resultado
+  // ==========================
+  function abrirPanel(){
+    announceMsg('Panel abierto');
+    speak('Abre el panel y ajusta tus escudos.');
+    document.getElementById('control-panel').scrollIntoView({behavior:'smooth', block:'nearest'});
+    tProfile.focus();
+  }
+
+  function activarEscudo(tipo){
+    if(tipo==='report'){
+      if(btnReport.disabled) return;
+      state.bossReported = true;
+      btnReport.setAttribute('aria-pressed','true');
+      feedback('boss','¡Jugada maestra, Guardián! ¡Nunca se le da la contraseña a nadie!');
+      beep('ok');
+    }
+  }
+
+  function feedback(tipo, msg){
+    if(tipo==='ok'){
+      speak('¡Escudo activado! ¡Tu club está más seguro!'); beep('ok');
+    } else if(tipo==='error'){
+      speak('¡Alerta, intruso! ¡Necesitamos reforzar esa defensa!'); beep('error');
+    } else if(tipo==='boss'){
+      speak('¡Jugada maestra, Guardián! ¡Nunca se le da la contraseña a nadie!');
+    }
+    announceMsg(msg || '');
+  }
+
+  function finalizarJuego(resultado){
+    state.running = false;
+    clearEntities();
+    let title='', desc='';
+    if(resultado==='victoria'){
+      state.keys += 1; updateHUD();
+      title = '¡Victoria! Fiesta segura 🎉';
+      desc = 'Has superado las 4 oleadas. El Mentor te otorga la Llave Dorada del Club. Frase de poder: “Con mi perfil privado y bien configurado, mi espacio digital está siempre cuidado”.';
+    } else {
+      title = 'Fiesta cancelada 😿';
+      desc = 'Entraron demasiados Curi‑Bots. El Mentor te anima a intentarlo otra vez.';
+    }
+    document.getElementById('result-title').textContent = title;
+    document.getElementById('result-desc').textContent = desc;
+    result.hidden = false;
+    result.querySelector('button').focus();
+  }
+
+  // ==========================
+  // Accesibilidad: anuncios y teclado
+  // ==========================
+  function announceMsg(text){ announce.textContent = text; }
+
+  // navegación por teclado entre toggles y botones del panel
+  function moveFocus(dir){
+    const items = state.toggles.filter(el=>!el.disabled);
+    if(items.length===0) return;
+    state.focusIdx = (state.focusIdx + (dir>0?1:-1) + items.length) % items.length;
+    items[state.focusIdx].focus();
+  }
+
+  document.addEventListener('keydown', (e)=>{
+    if(!state.running) return;
+    if(['ArrowRight','ArrowLeft'].includes(e.key)){
+      e.preventDefault(); moveFocus(e.key==='ArrowRight'? +1 : -1);
+    } else if(e.key==='Enter' || e.key===' '){
+      const el = document.activeElement;
+      if(el && (el.classList.contains('toggle') || el.id==='btn-report' || el.id==='btn-open-panel')){
+        e.preventDefault();
+        if(el.classList.contains('toggle')) toggleSwitch(el);
+        if(el.id==='btn-open-panel') abrirPanel();
+        if(el.id==='btn-report') activarEscudo('report');
+      }
+    }
+  });
+
+  // ==========================
+  // Eventos UI
+  // ==========================
+  btnStart.addEventListener('click', ()=>{ closeIntro(); iniciarJuego(); });
+  document.getElementById('intro-start').addEventListener('click', ()=>{ closeIntro(); iniciarJuego(); });
+  document.getElementById('intro-how').addEventListener('click', ()=>{ showHelp(); });
+  btnHelp.addEventListener('click', showHelp);
+  document.getElementById('help-close').addEventListener('click', ()=>{ help.hidden = true; document.getElementById('btn-help').focus(); });
+
+  function closeIntro(){ intro.hidden = true; if(audioCtx && audioCtx.state==='suspended'){ audioCtx.resume().catch(()=>{}); } }
+  function showHelp(){ help.hidden = false; help.querySelector('button').focus(); }
+
+  btnOpenPanel.addEventListener('click', abrirPanel);
+  btnReport.addEventListener('click', ()=>activarEscudo('report'));
+
+  [tProfile, tMsg, tFriends].forEach(t=>{
+    t.addEventListener('click', ()=> toggleSwitch(t));
+    t.addEventListener('keydown', e=>{ if(e.key==='Enter' || e.key===' ') { e.preventDefault(); toggleSwitch(t); } });
+  });
+
+  document.getElementById('btn-retry').addEventListener('click', ()=>{ result.hidden = true; iniciarJuego(); });
+  document.getElementById('btn-infinite').addEventListener('click', ()=>{
+    result.hidden = true; state.mode='infinite'; updateHUD(); iniciarInfinito();
+  });
+
+  // ==========================
+  // Modo infinito
+  // ==========================
+  function iniciarInfinito(){
+    state.running = true; state.score = 100; state.waveIndex = 0; state.bossReported=false;
+    [tProfile, tMsg, tFriends].forEach(t=>{ t.setAttribute('data-state','left'); t.setAttribute('aria-checked','false'); t.querySelector('.thumb').textContent = t.getAttribute('data-left'); });
+    btnReport.disabled = true; clearEntities(); updateHUD();
+    speak('Modo infinito. Las oleadas serán aleatorias.');
+    loopInfinito();
+  }
+
+  function loopInfinito(){
+    if(!state.running || state.mode!=='infinite') return;
+    // elegir una oleada al azar (1-3) y cada 4 rondas el jefe
+    const roundsBeforeBoss = 4;
+    const round = (state.waveIndex % roundsBeforeBoss);
+    if(round === roundsBeforeBoss-1){ // jefe
+      state.waveIndex++; updateHUD();
+      mostrarOleada(3); // índice 3 = jefe
+    } else {
+      const idx = Math.floor(Math.random()*3); // 0..2
+      state.waveIndex++; updateHUD();
+      mostrarOleada(idx);
+    }
+    // continuar automáticamente tras un breve tiempo
+    setTimeout(()=>{ if(state.running) nextWave(); if(state.score<=0) finalizarJuego('derrota'); }, 12000);
+  }
+
+  // ==========================
+  // Avance de oleadas automáticas de historia
+  // ==========================
+  // Controla el fin de una oleada simple por tiempo
+  setInterval(()=>{
+    if(!state.running || state.mode!=='story') return;
+    // cada 12s avanzar
+    if(state.waveIndex>0){
+      // victoria o derrota
+      if(state.waveIndex===4 && state.bossReported){ finalizarJuego('victoria'); }
+      else if(state.score<=0){ finalizarJuego('derrota'); }
+      else if(state.waveIndex>0){ /* esperar entities */ }
+    }
+  }, 1200);
+
+  // ==========================
+  // Bot de phishing: mensaje emergente
+  // ==========================
+  const phishMsg = document.createElement('div');
+  phishMsg.setAttribute('role','alertdialog'); phishMsg.setAttribute('aria-modal','false');
+  phishMsg.style.position='absolute'; phishMsg.style.right='16px'; phishMsg.style.top='16px'; phishMsg.style.background='#fff8e1'; phishMsg.style.color='#2b1600'; phishMsg.style.border='3px solid #b66a00'; phishMsg.style.borderRadius='14px'; phishMsg.style.boxShadow='var(--shadow)'; phishMsg.style.padding='10px 12px'; phishMsg.style.maxWidth='280px'; phishMsg.hidden = true;
+  phishMsg.innerHTML = '<strong>Administrador:</strong> Dame tu <em>contraseña</em> para verificar tu cuenta.';
+  board.appendChild(phishMsg);
+
+  // Mostrar el mensaje sólo en la oleada 4
+  const waveObserver = new MutationObserver(()=>{
+    const w = OLEADAS[state.waveIndex-1];
+    if(state.running && w && w.id===4){ phishMsg.hidden = false; }
+    else { phishMsg.hidden = true; }
+  });
+  waveObserver.observe(wavePill, {childList:true});
+
+  // ==========================
+  // Botones superiores
+  // ==========================
+  document.getElementById('btn-start').addEventListener('click', ()=>{ iniciarJuego(); });
+
+  // ==========================
+  // Inicio: voz y foco
+  // ==========================
+  speak('Bienvenido a El Club Secreto: Guardianes de la Fortaleza. Presiona Comenzar defensa.');
+  document.getElementById('btn-start').focus();
+
+  // ==========================
+  // Exponer funciones mínimas requeridas (para pruebas/manual)
+  // ==========================
+  window.iniciarJuego = iniciarJuego;
+  window.mostrarOleada = mostrarOleada;
+  window.abrirPanel = abrirPanel;
+  window.activarEscudo = activarEscudo;
+  window.validarAccion = validarAccion;
+  window.feedback = feedback;
+  window.finalizarJuego = finalizarJuego;
+
+  // Nota técnica sobre offline: este archivo no hace peticiones de red ni usa librerías externas.
+  // Tras cargarse, funciona desconectado. Para instalación como PWA, sirve registrando un SW propio
+  // cuando se aloje en un origen HTTPS (no se incluye aquí para mantener un solo archivo).
+  </script>
+</body>
+</html>
